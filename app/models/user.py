@@ -60,5 +60,13 @@ class User(Base):
     received_calls = relationship("VideoCall", foreign_keys="VideoCall.callee_id", back_populates="callee")
     call_participations = relationship("CallParticipant", back_populates="user")
     
+    # Push notification relationships
+    device_tokens = relationship("DeviceToken", back_populates="user")
+    push_notifications = relationship("PushNotification", back_populates="user")
+    
+    # Location relationships
+    locations = relationship("UserLocation", back_populates="user")
+    geofences = relationship("GeofenceArea", back_populates="user")
+    
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"

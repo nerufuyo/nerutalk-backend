@@ -9,6 +9,7 @@ import json
 import uuid
 import asyncio
 from typing import Optional
+from datetime import datetime
 
 
 async def get_current_user_websocket(websocket: WebSocket, token: str = Query(...), 
@@ -152,6 +153,15 @@ async def handle_websocket_message(message_data: dict, user_id: uuid.UUID, db: S
     
     elif message_type == "call_participant_left":
         await handle_call_participant_left(data, user_id)
+    
+    elif message_type == "location_update":
+        await handle_location_update(data, user_id, db)
+    
+    elif message_type == "location_share_start":
+        await handle_location_share_start(data, user_id, db)
+    
+    elif message_type == "location_share_stop":
+        await handle_location_share_stop(data, user_id, db)
     
     elif message_type == "ping":
         # Handle ping for connection keep-alive
@@ -601,3 +611,239 @@ async def cleanup_typing_indicators():
     while True:
         await connection_manager.cleanup_typing_indicators()
         await asyncio.sleep(30)  # Run every 30 seconds
+
+
+# Location-related WebSocket handlers
+
+async def handle_location_update(data: dict, user_id: uuid.UUID, db: Session):
+    """
+    Handle real-time location updates from clients.
+    
+    Args:
+        data (dict): Location data from client
+        user_id (uuid.UUID): User ID
+        db (Session): Database session
+    """
+    try:
+        from app.services.location_service import LocationService
+        from app.schemas.location import UserLocationCreate
+        
+        # Validate required fields
+        latitude = data.get("latitude")
+        longitude = data.get("longitude")
+        
+        if latitude is None or longitude is None:
+            await connection_manager.send_personal_message(user_id, {
+                "type": "error",
+                "data": {"message": "Latitude and longitude are required"}
+            })
+            return
+        
+        # Create location update data
+        location_data = UserLocationCreate(
+            latitude=latitude,
+            longitude=longitude,
+            accuracy=data.get("accuracy"),
+            altitude=data.get("altitude"),
+            speed=data.get("speed"),
+            heading=data.get("heading")
+        )
+        
+        # Update location using service
+        location_service = LocationService(db)
+        location = await location_service.update_user_location(int(user_id), location_data)
+        
+        # Send confirmation to user
+        await connection_manager.send_personal_message(user_id, {
+            "type": "location_updated",
+            "data": {
+                "latitude": location.latitude,
+                "longitude": location.longitude,
+                "timestamp": location.created_at.isoformat()
+            }
+        })
+        
+        # Notify users who are sharing location with this user
+        await notify_location_shares(user_id, location)
+        
+    except Exception as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Location update failed: {str(e)}"}
+        })
+
+
+async def handle_location_share_start(data: dict, user_id: uuid.UUID, db: Session):
+    """
+    Handle starting location sharing via WebSocket.
+    
+    Args:
+        data (dict): Location share data
+        user_id (uuid.UUID): User ID
+        db (Session): Database session
+    """
+    try:
+        from app.services.location_service import LocationService
+        from app.schemas.location import LocationShareCreate
+        from datetime import datetime, timedelta
+        
+        # Parse share data
+        target_user_id = data.get("target_user_id")
+        duration_minutes = data.get("duration_minutes", 60)
+        
+        # Create location share
+        share_data = LocationShareCreate(
+            target_user_id=target_user_id,
+            expires_at=datetime.utcnow() + timedelta(minutes=duration_minutes),
+            is_active=True
+        )
+        
+        location_service = LocationService(db)
+        location_share = await location_service.create_location_share(int(user_id), share_data)
+        
+        # Send confirmation to user
+        await connection_manager.send_personal_message(user_id, {
+            "type": "location_share_started",
+            "data": {
+                "share_id": location_share.id,
+                "target_user_id": location_share.target_user_id,
+                "expires_at": location_share.expires_at.isoformat() if location_share.expires_at else None
+            }
+        })
+        
+        # Notify target user if specific user share
+        if target_user_id:
+            try:
+                target_uuid = uuid.UUID(str(target_user_id))
+                await connection_manager.send_personal_message(target_uuid, {
+                    "type": "location_share_received",
+                    "data": {
+                        "sharer_id": int(user_id),
+                        "share_id": location_share.id,
+                        "expires_at": location_share.expires_at.isoformat() if location_share.expires_at else None
+                    }
+                })
+            except (ValueError, TypeError):
+                pass  # Skip invalid target user ID
+        
+    except Exception as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Location share start failed: {str(e)}"}
+        })
+
+
+async def handle_location_share_stop(data: dict, user_id: uuid.UUID, db: Session):
+    """
+    Handle stopping location sharing via WebSocket.
+    
+    Args:
+        data (dict): Location share data
+        user_id (uuid.UUID): User ID
+        db (Session): Database session
+    """
+    try:
+        from app.services.location_service import LocationService
+        
+        share_id = data.get("share_id")
+        if not share_id:
+            await connection_manager.send_personal_message(user_id, {
+                "type": "error",
+                "data": {"message": "Share ID is required"}
+            })
+            return
+        
+        location_service = LocationService(db)
+        success = await location_service.delete_location_share(share_id, int(user_id))
+        
+        if success:
+            await connection_manager.send_personal_message(user_id, {
+                "type": "location_share_stopped",
+                "data": {"share_id": share_id}
+            })
+        else:
+            await connection_manager.send_personal_message(user_id, {
+                "type": "error",
+                "data": {"message": "Location share not found or access denied"}
+            })
+        
+    except Exception as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Location share stop failed: {str(e)}"}
+        })
+
+
+async def notify_location_shares(user_id: uuid.UUID, location):
+    """
+    Notify users who are sharing location with the updated user.
+    
+    Args:
+        user_id (uuid.UUID): User who updated location
+        location: Location object with updated coordinates
+    """
+    try:
+        from app.repositories.location_repository import LocationRepository
+        from app.core.database import get_db
+        
+        # Get database session
+        db_gen = get_db()
+        db = next(db_gen)
+        
+        try:
+            location_repo = LocationRepository(db)
+            
+            # Get users who have access to this user's location
+            active_shares = location_repo.get_active_location_shares(int(user_id))
+            
+            for share in active_shares:
+                # Send location update to target user
+                if share.target_user_id:
+                    try:
+                        target_uuid = uuid.UUID(str(share.target_user_id))
+                        await connection_manager.send_personal_message(target_uuid, {
+                            "type": "shared_location_update",
+                            "data": {
+                                "user_id": int(user_id),
+                                "latitude": location.latitude,
+                                "longitude": location.longitude,
+                                "accuracy": location.accuracy,
+                                "timestamp": location.created_at.isoformat(),
+                                "share_id": share.id
+                            }
+                        })
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid target user IDs
+        finally:
+            db.close()
+            
+    except Exception as e:
+        # Log error but don't interrupt the main location update
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error notifying location shares: {str(e)}")
+
+
+async def notify_geofence_event(user_id: int, geofence_name: str, event_type: str, location_data: dict):
+    """
+    Notify user about geofence events via WebSocket.
+    
+    Args:
+        user_id (int): User ID
+        geofence_name (str): Name of the geofence area
+        event_type (str): Type of event (entry/exit)
+        location_data (dict): Location data when event occurred
+    """
+    try:
+        user_uuid = uuid.UUID(str(user_id))
+        await connection_manager.send_personal_message(user_uuid, {
+            "type": "geofence_event",
+            "data": {
+                "geofence_name": geofence_name,
+                "event_type": event_type,
+                "location": location_data,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        })
+    except (ValueError, TypeError):
+        pass  # Skip invalid user ID

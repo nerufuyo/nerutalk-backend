@@ -6,6 +6,8 @@ from app.api.v1.chat import router as chat_router
 from app.api.v1.files import router as files_router
 from app.api.v1.media import router as media_router
 from app.api.v1.video_calls import router as video_calls_router
+from app.api.v1.push_notifications import router as push_notifications_router
+from app.api.v1.location import router as location_router
 from app.websocket.websocket_handler import websocket_endpoint, cleanup_typing_indicators
 import asyncio
 
@@ -33,6 +35,8 @@ app.include_router(chat_router, prefix="/api/v1")
 app.include_router(files_router, prefix="/api/v1")
 app.include_router(media_router, prefix="/api/v1")
 app.include_router(video_calls_router, prefix="/api/v1")
+app.include_router(push_notifications_router, prefix="/api/v1")
+app.include_router(location_router, prefix="/api/v1", tags=["location"])
 
 # WebSocket endpoint
 app.websocket("/ws")(websocket_endpoint)
