@@ -55,5 +55,10 @@ class User(Base):
     sent_messages = relationship("Message", back_populates="sender")
     chat_participations = relationship("ChatParticipant", back_populates="user")
     
+    # Video call relationships
+    initiated_calls = relationship("VideoCall", foreign_keys="VideoCall.caller_id", back_populates="caller")
+    received_calls = relationship("VideoCall", foreign_keys="VideoCall.callee_id", back_populates="callee")
+    call_participations = relationship("CallParticipant", back_populates="user")
+    
     def __repr__(self):
         return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"

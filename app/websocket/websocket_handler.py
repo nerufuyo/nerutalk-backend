@@ -135,6 +135,24 @@ async def handle_websocket_message(message_data: dict, user_id: uuid.UUID, db: S
     elif message_type == "message_read":
         await handle_message_read(data, user_id, db)
     
+    elif message_type == "call_initiated":
+        await handle_call_initiated(data, user_id)
+    
+    elif message_type == "call_answered":
+        await handle_call_answered(data, user_id)
+    
+    elif message_type == "call_declined":
+        await handle_call_declined(data, user_id)
+    
+    elif message_type == "call_ended":
+        await handle_call_ended(data, user_id)
+    
+    elif message_type == "call_participant_joined":
+        await handle_call_participant_joined(data, user_id)
+    
+    elif message_type == "call_participant_left":
+        await handle_call_participant_left(data, user_id)
+    
     elif message_type == "ping":
         # Handle ping for connection keep-alive
         await connection_manager.send_personal_message(user_id, {
@@ -318,6 +336,264 @@ async def broadcast_message_delete(message_id: uuid.UUID, chat_id: uuid.UUID):
     
     await connection_manager.broadcast_to_chat(chat_id, message)
 
+
+# Video Call WebSocket Handlers
+
+async def handle_call_initiated(data: dict, user_id: uuid.UUID):
+    """
+    Handle video call initiation notification.
+    
+    Args:
+        data (dict): Call data containing call_id, callee_id, etc.
+        user_id (uuid.UUID): Caller's user ID
+    """
+    try:
+        call_id = data.get("call_id")
+        callee_id = uuid.UUID(data.get("callee_id"))
+        call_type = data.get("call_type", "video")
+        channel_name = data.get("channel_name")
+        
+        # Notify the callee about incoming call
+        await connection_manager.send_personal_message(callee_id, {
+            "type": "incoming_call",
+            "data": {
+                "call_id": call_id,
+                "caller_id": str(user_id),
+                "call_type": call_type,
+                "channel_name": channel_name
+            }
+        })
+        
+        # Send confirmation to caller
+        await connection_manager.send_personal_message(user_id, {
+            "type": "call_initiated_success",
+            "data": {
+                "call_id": call_id,
+                "channel_name": channel_name
+            }
+        })
+        
+    except (ValueError, KeyError) as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Invalid call initiation data: {str(e)}"}
+        })
+
+
+async def handle_call_answered(data: dict, user_id: uuid.UUID):
+    """
+    Handle call answer notification.
+    
+    Args:
+        data (dict): Call data containing call_id, accept status
+        user_id (uuid.UUID): Callee's user ID
+    """
+    try:
+        call_id = data.get("call_id")
+        caller_id = uuid.UUID(data.get("caller_id"))
+        accepted = data.get("accepted", False)
+        channel_name = data.get("channel_name")
+        
+        if accepted:
+            # Notify caller that call was answered
+            await connection_manager.send_personal_message(caller_id, {
+                "type": "call_answered",
+                "data": {
+                    "call_id": call_id,
+                    "callee_id": str(user_id),
+                    "channel_name": channel_name
+                }
+            })
+        else:
+            # Notify caller that call was declined
+            await connection_manager.send_personal_message(caller_id, {
+                "type": "call_declined",
+                "data": {
+                    "call_id": call_id,
+                    "callee_id": str(user_id)
+                }
+            })
+        
+    except (ValueError, KeyError) as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Invalid call answer data: {str(e)}"}
+        })
+
+
+async def handle_call_declined(data: dict, user_id: uuid.UUID):
+    """
+    Handle call decline notification.
+    
+    Args:
+        data (dict): Call data containing call_id, caller_id
+        user_id (uuid.UUID): Callee's user ID
+    """
+    try:
+        call_id = data.get("call_id")
+        caller_id = uuid.UUID(data.get("caller_id"))
+        
+        # Notify caller that call was declined
+        await connection_manager.send_personal_message(caller_id, {
+            "type": "call_declined",
+            "data": {
+                "call_id": call_id,
+                "callee_id": str(user_id)
+            }
+        })
+        
+    except (ValueError, KeyError) as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Invalid call decline data: {str(e)}"}
+        })
+
+
+async def handle_call_ended(data: dict, user_id: uuid.UUID):
+    """
+    Handle call end notification.
+    
+    Args:
+        data (dict): Call data containing call_id, participants
+        user_id (uuid.UUID): User who ended the call
+    """
+    try:
+        call_id = data.get("call_id")
+        participants = data.get("participants", [])
+        end_reason = data.get("end_reason", "user_ended")
+        
+        # Notify all participants that call has ended
+        for participant_id in participants:
+            try:
+                participant_uuid = uuid.UUID(participant_id)
+                if participant_uuid != user_id:  # Don't notify the user who ended the call
+                    await connection_manager.send_personal_message(participant_uuid, {
+                        "type": "call_ended",
+                        "data": {
+                            "call_id": call_id,
+                            "ended_by": str(user_id),
+                            "end_reason": end_reason
+                        }
+                    })
+            except ValueError:
+                continue  # Skip invalid participant IDs
+        
+    except (ValueError, KeyError) as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Invalid call end data: {str(e)}"}
+        })
+
+
+async def handle_call_participant_joined(data: dict, user_id: uuid.UUID):
+    """
+    Handle participant joining a group call.
+    
+    Args:
+        data (dict): Call data containing call_id, participant info
+        user_id (uuid.UUID): User ID of the participant who joined
+    """
+    try:
+        call_id = data.get("call_id")
+        participants = data.get("participants", [])
+        participant_name = data.get("participant_name", "Unknown")
+        
+        # Notify all other participants about the new joiner
+        for participant_id in participants:
+            try:
+                participant_uuid = uuid.UUID(participant_id)
+                if participant_uuid != user_id:  # Don't notify the joiner
+                    await connection_manager.send_personal_message(participant_uuid, {
+                        "type": "call_participant_joined",
+                        "data": {
+                            "call_id": call_id,
+                            "participant_id": str(user_id),
+                            "participant_name": participant_name
+                        }
+                    })
+            except ValueError:
+                continue  # Skip invalid participant IDs
+        
+    except (ValueError, KeyError) as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Invalid participant join data: {str(e)}"}
+        })
+
+
+async def handle_call_participant_left(data: dict, user_id: uuid.UUID):
+    """
+    Handle participant leaving a group call.
+    
+    Args:
+        data (dict): Call data containing call_id, participant info
+        user_id (uuid.UUID): User ID of the participant who left
+    """
+    try:
+        call_id = data.get("call_id")
+        participants = data.get("participants", [])
+        participant_name = data.get("participant_name", "Unknown")
+        
+        # Notify all remaining participants about the departure
+        for participant_id in participants:
+            try:
+                participant_uuid = uuid.UUID(participant_id)
+                if participant_uuid != user_id:  # Don't notify the leaver
+                    await connection_manager.send_personal_message(participant_uuid, {
+                        "type": "call_participant_left",
+                        "data": {
+                            "call_id": call_id,
+                            "participant_id": str(user_id),
+                            "participant_name": participant_name
+                        }
+                    })
+            except ValueError:
+                continue  # Skip invalid participant IDs
+        
+    except (ValueError, KeyError) as e:
+        await connection_manager.send_personal_message(user_id, {
+            "type": "error",
+            "data": {"message": f"Invalid participant leave data: {str(e)}"}
+        })
+
+
+# Video call utility functions for broadcasting
+
+async def broadcast_call_event(event_type: str, call_data: dict, participants: list):
+    """
+    Broadcast a call event to all participants.
+    
+    Args:
+        event_type (str): Type of call event
+        call_data (dict): Call event data
+        participants (list): List of participant user IDs
+    """
+    message = {
+        "type": event_type,
+        "data": call_data
+    }
+    
+    for participant_id in participants:
+        try:
+            participant_uuid = uuid.UUID(participant_id)
+            await connection_manager.send_personal_message(participant_uuid, message)
+        except (ValueError, TypeError):
+            continue  # Skip invalid participant IDs
+
+
+async def notify_call_quality_update(call_id: int, quality_data: dict, participants: list):
+    """
+    Notify participants about call quality updates.
+    
+    Args:
+        call_id (int): Call ID
+        quality_data (dict): Quality metrics data
+        participants (list): List of participant user IDs
+    """
+    await broadcast_call_event("call_quality_update", {
+        "call_id": call_id,
+        "quality": quality_data
+    }, participants)
 
 # Background task to clean up typing indicators
 async def cleanup_typing_indicators():

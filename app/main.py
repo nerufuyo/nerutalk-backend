@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
+from app.api.v1.files import router as files_router
+from app.api.v1.media import router as media_router
+from app.api.v1.video_calls import router as video_calls_router
 from app.websocket.websocket_handler import websocket_endpoint, cleanup_typing_indicators
 import asyncio
 
@@ -27,6 +30,9 @@ app.add_middleware(
 # Include API routers
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
+app.include_router(files_router, prefix="/api/v1")
+app.include_router(media_router, prefix="/api/v1")
+app.include_router(video_calls_router, prefix="/api/v1")
 
 # WebSocket endpoint
 app.websocket("/ws")(websocket_endpoint)

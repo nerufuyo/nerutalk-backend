@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     agora_app_id: Optional[str] = None
     agora_app_certificate: Optional[str] = None
     
+    # Expose as uppercase for service usage
+    @property
+    def AGORA_APP_ID(self) -> Optional[str]:
+        return self.agora_app_id
+    
+    @property
+    def AGORA_APP_CERTIFICATE(self) -> Optional[str]:
+        return self.agora_app_certificate
+    
     # Email settings
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
