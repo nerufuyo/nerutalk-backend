@@ -24,6 +24,7 @@ A comprehensive backend API for a modern chat application built with FastAPI, fe
 - **Scalable Design**: Repository pattern with service layer abstraction
 - **Comprehensive API**: RESTful APIs with automatic OpenAPI documentation
 - **WebSocket Support**: Real-time communication for chat, calls, and location updates
+- **Multi-language Support**: Internationalization with EN, ID, JP, KO, CN languages
 - **Security**: Environment-based configuration with secure token handling
 - **Database Migrations**: Alembic-based database version control
 
@@ -110,6 +111,11 @@ A comprehensive backend API for a modern chat application built with FastAPI, fe
 - `DELETE /api/v1/location/geofences/{geofence_id}` - Delete geofence area
 - `GET /api/v1/location/geofences/events` - Get geofence events
 
+### Language Support
+- `GET /api/v1/languages` - Get supported languages with localized names
+- `GET /api/v1/language/current` - Get current language information
+- `GET /api/v1/language/test` - Test language translations
+
 ## WebSocket Events
 
 ### Chat Events
@@ -132,6 +138,406 @@ A comprehensive backend API for a modern chat application built with FastAPI, fe
 - `location_share_stop` - Stop sharing location
 - `shared_location_update` - Receive shared location update
 - `geofence_event` - Geofence entry/exit notification
+
+## Language Support
+
+The API supports internationalization with the following languages:
+- **English (en)** - Default language
+- **Indonesian (id)** - Bahasa Indonesia
+- **Japanese (jp)** - 日本語
+- **Korean (ko)** - 한국어
+- **Chinese (cn)** - 中文
+
+### Language API Endpoints
+- `GET /api/v1/languages` - Get supported languages
+- `GET /api/v1/language/current` - Get current language info
+- `GET /api/v1/language/test` - Test language translations
+
+### Language Headers
+- `Accept-Language: en,id;q=0.9,jp;q=0.8` - Standard language preference
+- `X-Language: id` - Force specific language
+
+## Database Schema
+
+### Core Tables
+
+#### users
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(100),
+    avatar_url VARCHAR(255),
+    bio TEXT,
+    is_active BOOLEAN DEFAULT true,
+    is_verified BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_seen TIMESTAMP
+);
+```
+
+#### chats
+```sql
+CREATE TABLE chats (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    description TEXT,
+    chat_type VARCHAR(20) DEFAULT 'private', -- private, group
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### messages
+```sql
+CREATE TABLE messages (
+    id SERIAL PRIMARY KEY,
+    chat_id INTEGER REFERENCES chats(id),
+    sender_id UUID REFERENCES users(id),
+    content TEXT,
+    message_type VARCHAR(20) DEFAULT 'text', -- text, image, video, file, sticker
+    file_url VARCHAR(255),
+    file_name VARCHAR(255),
+    file_size INTEGER,
+    reply_to_id INTEGER REFERENCES messages(id),
+    is_edited BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### chat_participants
+```sql
+CREATE TABLE chat_participants (
+    id SERIAL PRIMARY KEY,
+    chat_id INTEGER REFERENCES chats(id),
+    user_id UUID REFERENCES users(id),
+    role VARCHAR(20) DEFAULT 'member', -- admin, member
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    left_at TIMESTAMP,
+    UNIQUE(chat_id, user_id)
+);
+```
+
+### Video Call Tables
+
+#### video_calls
+```sql
+CREATE TABLE video_calls (
+    id SERIAL PRIMARY KEY,
+    channel_name VARCHAR(255) UNIQUE NOT NULL,
+    call_type VARCHAR(20) DEFAULT 'video', -- video, audio
+    status VARCHAR(20) DEFAULT 'initiated', -- initiated, ongoing, ended
+    initiated_by UUID REFERENCES users(id),
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    duration INTEGER -- seconds
+);
+```
+
+#### call_participants
+```sql
+CREATE TABLE call_participants (
+    id SERIAL PRIMARY KEY,
+    call_id INTEGER REFERENCES video_calls(id),
+    user_id UUID REFERENCES users(id),
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    left_at TIMESTAMP,
+    UNIQUE(call_id, user_id)
+);
+```
+
+### Push Notification Tables
+
+#### device_tokens
+```sql
+CREATE TABLE device_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    token VARCHAR(255) UNIQUE NOT NULL,
+    device_type VARCHAR(20), -- ios, android, web
+    device_id VARCHAR(255),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### push_notifications
+```sql
+CREATE TABLE push_notifications (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    notification_type VARCHAR(50), -- message, call, system
+    category VARCHAR(50),
+    data JSONB,
+    is_sent BOOLEAN DEFAULT false,
+    fcm_message_id VARCHAR(255),
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sent_at TIMESTAMP
+);
+```
+
+### Location Tables
+
+#### user_locations
+```sql
+CREATE TABLE user_locations (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    latitude DECIMAL(10, 7) NOT NULL,
+    longitude DECIMAL(10, 7) NOT NULL,
+    accuracy DECIMAL(6, 2),
+    altitude DECIMAL(8, 2),
+    speed DECIMAL(6, 2),
+    heading DECIMAL(5, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### location_shares
+```sql
+CREATE TABLE location_shares (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    target_user_id UUID REFERENCES users(id), -- NULL for public share
+    expires_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### geofence_areas
+```sql
+CREATE TABLE geofence_areas (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    name VARCHAR(255) NOT NULL,
+    center_latitude DECIMAL(10, 7) NOT NULL,
+    center_longitude DECIMAL(10, 7) NOT NULL,
+    radius_meters INTEGER NOT NULL,
+    notify_on_entry BOOLEAN DEFAULT true,
+    notify_on_exit BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### geofence_events
+```sql
+CREATE TABLE geofence_events (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    geofence_id INTEGER REFERENCES geofence_areas(id),
+    event_type VARCHAR(20), -- entry, exit
+    latitude DECIMAL(10, 7),
+    longitude DECIMAL(10, 7),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+## External Service Schemas
+
+### AWS S3 Configuration
+
+#### Bucket Structure
+```
+your-bucket-name/
+├── avatars/
+│   ├── {user_id}/
+│   │   ├── original.jpg
+│   │   └── thumbnail.jpg
+├── chat-files/
+│   ├── {chat_id}/
+│   │   ├── {file_id}.{ext}
+│   │   └── thumbnails/
+│   │       └── {file_id}_thumb.jpg
+├── stickers/
+│   ├── packs/
+│   │   └── {pack_id}/
+│   │       └── {sticker_id}.{ext}
+└── temp/
+    └── {upload_id}.{ext}
+```
+
+#### S3 Bucket Policy
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::your-bucket-name/public/*"
+    },
+    {
+      "Sid": "AuthenticatedUpload",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT:user/nerutalk-api"
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::your-bucket-name/*"
+    }
+  ]
+}
+```
+
+### Firebase Cloud Messaging (FCM)
+
+#### Service Account JSON Structure
+```json
+{
+  "type": "service_account",
+  "project_id": "your-project-id",
+  "private_key_id": "key-id",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-xxx@your-project-id.iam.gserviceaccount.com",
+  "client_id": "client-id",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+}
+```
+
+#### FCM Message Payload Structure
+```json
+{
+  "message": {
+    "token": "device-token",
+    "notification": {
+      "title": "Message Title",
+      "body": "Message Body"
+    },
+    "data": {
+      "type": "message",
+      "chat_id": "123",
+      "sender_id": "user-id"
+    },
+    "android": {
+      "notification": {
+        "click_action": "FLUTTER_NOTIFICATION_CLICK",
+        "sound": "default"
+      }
+    },
+    "apns": {
+      "payload": {
+        "aps": {
+          "sound": "default",
+          "badge": 1
+        }
+      }
+    }
+  }
+}
+```
+
+### Agora.io Video Calls
+
+#### Channel Configuration
+```javascript
+{
+  "appId": "your-agora-app-id",
+  "channel": "unique-channel-name",
+  "token": "generated-rtc-token",
+  "uid": 12345,
+  "role": "host", // host or audience
+  "privilege": {
+    "joinChannel": true,
+    "publishStream": true
+  },
+  "expireTime": 86400 // 24 hours in seconds
+}
+```
+
+#### WebRTC Configuration
+```json
+{
+  "iceServers": [
+    {
+      "urls": "stun:stun.agora.io"
+    },
+    {
+      "urls": "turn:turn.agora.io",
+      "username": "username",
+      "credential": "password"
+    }
+  ],
+  "iceCandidatePoolSize": 10
+}
+```
+
+### WebSocket Connection Schema
+
+#### Connection Handshake
+```
+ws://localhost:8000/ws?token=jwt-token
+```
+
+#### Message Format
+```json
+{
+  "type": "message_type",
+  "data": {
+    "key": "value"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "language": "en"
+}
+```
+
+#### Event Types
+```typescript
+interface WebSocketMessage {
+  type: 'join_chat' | 'leave_chat' | 'typing_indicator' | 'message_read' |
+        'call_initiated' | 'call_answered' | 'call_declined' | 'call_ended' |
+        'location_update' | 'location_share_start' | 'location_share_stop';
+  data: any;
+  timestamp?: string;
+  language?: string;
+}
+```
+
+### Redis Schema
+
+#### Cache Keys Structure
+```
+nerutalk:
+├── sessions:{user_id} -> session_data
+├── chat_typing:{chat_id} -> {user_id: timestamp}
+├── user_status:{user_id} -> online|offline|away
+├── call_tokens:{call_id} -> agora_token
+├── rate_limit:{ip}:{endpoint} -> request_count
+└── location_cache:{user_id} -> location_data
+```
+
+#### Session Data Structure
+```json
+{
+  "user_id": "uuid",
+  "username": "string",
+  "last_activity": "timestamp",
+  "device_info": {
+    "type": "mobile|web|desktop",
+    "os": "ios|android|windows|macos|linux",
+    "version": "app_version"
+  },
+  "language": "en|id|jp|ko|cn"
+}
+```
 
 ## Quick Start
 
@@ -227,6 +633,13 @@ TENOR_API_KEY=your-tenor-api-key
 ```env
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 TRUSTED_HOSTS=localhost,127.0.0.1
+```
+
+#### Language & Internationalization
+```env
+DEFAULT_LANGUAGE=en
+SUPPORTED_LANGUAGES=en,id,jp,ko,cn
+AUTO_DETECT_LANGUAGE=true
 ```
 
 #### Background Tasks

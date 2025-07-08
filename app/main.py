@@ -8,6 +8,8 @@ from app.api.v1.media import router as media_router
 from app.api.v1.video_calls import router as video_calls_router
 from app.api.v1.push_notifications import router as push_notifications_router
 from app.api.v1.location import router as location_router
+from app.api.v1.language import router as language_router
+from app.utils.language_middleware import LanguageMiddleware
 from app.websocket.websocket_handler import websocket_endpoint, cleanup_typing_indicators
 import asyncio
 
@@ -15,10 +17,13 @@ import asyncio
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Backend API for NeruTalk chat application",
+    description="Backend API for NeruTalk chat application with multi-language support",
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Add language middleware
+app.add_middleware(LanguageMiddleware)
 
 # CORS middleware configuration
 app.add_middleware(
@@ -37,6 +42,7 @@ app.include_router(media_router, prefix="/api/v1")
 app.include_router(video_calls_router, prefix="/api/v1")
 app.include_router(push_notifications_router, prefix="/api/v1")
 app.include_router(location_router, prefix="/api/v1", tags=["location"])
+app.include_router(language_router, prefix="/api/v1", tags=["language"])
 
 # WebSocket endpoint
 app.websocket("/ws")(websocket_endpoint)
