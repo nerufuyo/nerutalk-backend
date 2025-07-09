@@ -12,7 +12,7 @@ from app.schemas.push_notification import (
     PushNotificationSend, PushNotificationBroadcast, PushNotificationResponse,
     NotificationStats, MessageNotificationData, CallNotificationData, SystemNotificationData
 )
-from app.schemas.auth import User
+from app.schemas.auth import UserResponse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ def get_push_notification_service(db: Session = Depends(get_db)) -> PushNotifica
 async def get_current_user(
     auth_service: AuthService = Depends(get_auth_service),
     db: Session = Depends(get_db)
-) -> User:
+) -> UserResponse:
     """Get current authenticated user."""
     # This would typically involve JWT token validation
     # For now, we'll use a placeholder implementation
@@ -44,7 +44,7 @@ async def get_current_user(
 @router.post("/device-tokens", response_model=DeviceTokenResponse)
 async def register_device_token(
     token_data: DeviceTokenCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -79,7 +79,7 @@ async def register_device_token(
 
 @router.get("/device-tokens", response_model=List[DeviceTokenResponse])
 async def get_device_tokens(
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -107,7 +107,7 @@ async def get_device_tokens(
 async def update_device_token(
     token_id: int,
     token_data: DeviceTokenUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -147,7 +147,7 @@ async def update_device_token(
 @router.delete("/device-tokens/{token_id}")
 async def deactivate_device_token(
     token_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -185,7 +185,7 @@ async def deactivate_device_token(
 @router.post("/send")
 async def send_notifications(
     notification_data: PushNotificationSend,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -214,7 +214,7 @@ async def send_notifications(
 @router.post("/broadcast")
 async def broadcast_notification(
     notification_data: PushNotificationBroadcast,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -246,7 +246,7 @@ async def send_message_notification(
     sender_name: str,
     message_data: MessageNotificationData,
     chat_name: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -283,7 +283,7 @@ async def send_message_notification(
 async def send_call_notification(
     recipient_user_id: int,
     call_data: CallNotificationData,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -318,7 +318,7 @@ async def send_system_notification(
     system_data: SystemNotificationData,
     title: Optional[str] = None,
     body: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -354,7 +354,7 @@ async def send_system_notification(
 @router.get("/stats", response_model=NotificationStats)
 async def get_notification_stats(
     days: int = Query(30, ge=1, le=365),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """
@@ -385,7 +385,7 @@ async def get_notification_stats(
 @router.get("/stats/admin", response_model=NotificationStats)
 async def get_admin_notification_stats(
     days: int = Query(30, ge=1, le=365),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     notification_service: PushNotificationService = Depends(get_push_notification_service)
 ):
     """

@@ -11,7 +11,7 @@ from app.schemas.video_call import (
     VideoCallInitiate, VideoCallResponse, VideoCallAnswer, VideoCallEnd,
     VideoCallHistory, AgoraTokenRequest, AgoraTokenResponse, CallStatistics
 )
-from app.schemas.auth import User
+from app.schemas.auth import UserResponse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ def get_video_call_service(db: Session = Depends(get_db)) -> VideoCallService:
 async def get_current_user(
     auth_service: AuthService = Depends(get_auth_service),
     db: Session = Depends(get_db)
-) -> User:
+) -> UserResponse:
     """Get current authenticated user."""
     # This would typically involve JWT token validation
     # For now, we'll use a placeholder implementation
@@ -43,7 +43,7 @@ async def get_current_user(
 @router.post("/initiate", response_model=VideoCallResponse)
 async def initiate_call(
     call_data: VideoCallInitiate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -80,7 +80,7 @@ async def initiate_call(
 async def answer_call(
     call_id: int,
     answer_data: VideoCallAnswer,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -119,7 +119,7 @@ async def answer_call(
 async def end_call(
     call_id: int,
     end_data: VideoCallEnd,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -158,7 +158,7 @@ async def end_call(
 @router.get("/{call_id}", response_model=VideoCallResponse)
 async def get_call(
     call_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -195,7 +195,7 @@ async def get_call(
 
 @router.get("/", response_model=List[VideoCallResponse])
 async def get_active_calls(
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -223,7 +223,7 @@ async def get_active_calls(
 async def get_call_history(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -256,7 +256,7 @@ async def get_call_history(
 @router.post("/token", response_model=AgoraTokenResponse)
 async def generate_agora_token(
     token_request: AgoraTokenRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -288,7 +288,7 @@ async def generate_agora_token(
 @router.get("/statistics/", response_model=CallStatistics)
 async def get_call_statistics(
     days: int = Query(30, ge=1, le=365),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -320,7 +320,7 @@ async def get_call_statistics(
 async def add_participant_to_group_call(
     call_id: int,
     user_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """
@@ -365,7 +365,7 @@ async def add_participant_to_group_call(
 async def remove_participant_from_group_call(
     call_id: int,
     user_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     video_call_service: VideoCallService = Depends(get_video_call_service)
 ):
     """

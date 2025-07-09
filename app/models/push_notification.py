@@ -3,8 +3,10 @@ Device token model for push notifications.
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from enum import Enum
+import uuid
 from app.core.database import Base
 
 
@@ -19,7 +21,7 @@ class DeviceToken(Base):
     __tablename__ = "device_tokens"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     token = Column(String, nullable=False, index=True)
     device_type = Column(SQLEnum(DeviceType), nullable=False)
     device_id = Column(String, nullable=True)  # Unique device identifier
@@ -46,7 +48,7 @@ class PushNotification(Base):
     __tablename__ = "push_notifications"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     device_token_id = Column(Integer, ForeignKey("device_tokens.id"), nullable=True)
     
     # Notification content

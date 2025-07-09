@@ -4,6 +4,7 @@ Location tracking schemas for request/response data validation.
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, Field, validator
+from uuid import UUID
 
 
 class UserLocationBase(BaseModel):
@@ -209,14 +210,18 @@ class NearbyUsersRequest(BaseModel):
     limit: int = Field(10, ge=1, le=50)
 
 
-class NearbyUserResponse(BaseModel):
-    """Schema for nearby user response."""
-    user_id: int
+class NearbyUsersResponse(BaseModel):
+    """Schema for nearby users response."""
+    user_id: UUID
     username: str
+    display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     distance: float  # Distance in meters
-    last_seen: datetime
-    is_sharing_location: bool
+    last_seen: Optional[datetime] = None
+    is_sharing_location: bool = True
+
+    class Config:
+        from_attributes = True
 
 
 class LocationStatsResponse(BaseModel):

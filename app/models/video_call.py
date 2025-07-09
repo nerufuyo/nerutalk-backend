@@ -3,8 +3,10 @@ Video call models for the NeruTalk application.
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from enum import Enum
+import uuid
 from app.core.database import Base
 
 
@@ -33,8 +35,8 @@ class VideoCall(Base):
     status = Column(SQLEnum(CallStatus), nullable=False, default=CallStatus.INITIATED)
     
     # Participants
-    caller_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    callee_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    caller_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    callee_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Agora specific
     app_id = Column(String, nullable=True)
@@ -64,7 +66,7 @@ class CallParticipant(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     call_id = Column(Integer, ForeignKey("video_calls.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Participant specific
     joined_at = Column(DateTime, nullable=True)

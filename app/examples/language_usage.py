@@ -5,7 +5,7 @@ This file demonstrates best practices for internationalization.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.api.v1.auth import get_current_user
 from app.models.user import User
 from app.utils.language import get_text, SupportedLanguage
 from app.utils.language_middleware import get_current_language

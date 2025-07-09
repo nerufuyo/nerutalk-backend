@@ -3,7 +3,9 @@ Location tracking models for the NeruTalk application.
 """
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Float, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+import uuid
 from app.core.database import Base
 
 
@@ -12,7 +14,7 @@ class UserLocation(Base):
     __tablename__ = "user_locations"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Location coordinates
     latitude = Column(Float, nullable=False)
@@ -51,9 +53,9 @@ class LocationShare(Base):
     __tablename__ = "location_shares"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Who is sharing
-    shared_with_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Individual user
-    shared_with_chat_id = Column(Integer, ForeignKey("chats.id"), nullable=True)  # Chat group
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)  # Who is sharing
+    shared_with_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)  # Individual user
+    shared_with_chat_id = Column(UUID(as_uuid=True), ForeignKey("chats.id"), nullable=True)  # Chat group
     
     # Location reference
     location_id = Column(Integer, ForeignKey("user_locations.id"), nullable=False)
@@ -83,7 +85,7 @@ class LocationHistory(Base):
     __tablename__ = "location_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Start and end locations
     start_latitude = Column(Float, nullable=False)
@@ -118,7 +120,7 @@ class GeofenceArea(Base):
     __tablename__ = "geofence_areas"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Geofence definition
     name = Column(String(100), nullable=False)
@@ -151,7 +153,7 @@ class GeofenceEvent(Base):
     __tablename__ = "geofence_events"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     geofence_id = Column(Integer, ForeignKey("geofence_areas.id"), nullable=False)
     
     # Event details

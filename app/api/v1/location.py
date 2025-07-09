@@ -7,8 +7,8 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_db
-from app.core.security import get_current_user
-from app.models.user import User
+from app.api.v1.auth import get_current_user
+from app.schemas.auth import UserResponse
 from app.services.location_service import LocationService
 from app.schemas.location import (
     UserLocationCreate, UserLocationUpdate, UserLocationResponse,
@@ -23,7 +23,7 @@ router = APIRouter()
 @router.post("/update", response_model=UserLocationResponse)
 async def update_location(
     location_data: UserLocationCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update user's current location."""
@@ -34,7 +34,7 @@ async def update_location(
 @router.get("/current/{user_id}", response_model=Optional[UserLocationResponse])
 async def get_user_location(
     user_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get user's current location if sharing is enabled."""
@@ -50,7 +50,7 @@ async def get_user_location(
 
 @router.get("/current", response_model=Optional[UserLocationResponse])
 async def get_my_location(
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get current user's location."""
@@ -64,7 +64,7 @@ async def get_location_history(
     start_time: Optional[datetime] = Query(None, description="Start time for history"),
     end_time: Optional[datetime] = Query(None, description="End time for history"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of locations"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get user's location history if sharing is enabled."""
@@ -79,7 +79,7 @@ async def get_my_location_history(
     start_time: Optional[datetime] = Query(None, description="Start time for history"),
     end_time: Optional[datetime] = Query(None, description="End time for history"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of locations"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get current user's location history."""
@@ -93,7 +93,7 @@ async def get_my_location_history(
 async def find_nearby_users(
     radius_meters: int = Query(1000, ge=100, le=10000, description="Search radius in meters"),
     limit: int = Query(50, ge=1, le=100, description="Maximum number of users"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Find nearby users within specified radius."""
@@ -104,7 +104,7 @@ async def find_nearby_users(
 @router.post("/shares", response_model=LocationShareResponse)
 async def create_location_share(
     share_data: LocationShareCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new location share."""
@@ -114,7 +114,7 @@ async def create_location_share(
 
 @router.get("/shares", response_model=List[LocationShareResponse])
 async def get_location_shares(
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get all location shares for current user."""
@@ -126,7 +126,7 @@ async def get_location_shares(
 async def update_location_share(
     share_id: int,
     share_data: LocationShareUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update a location share."""
@@ -145,7 +145,7 @@ async def update_location_share(
 @router.delete("/shares/{share_id}")
 async def delete_location_share(
     share_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a location share."""
@@ -162,7 +162,7 @@ async def delete_location_share(
 @router.post("/geofences", response_model=GeofenceAreaResponse)
 async def create_geofence_area(
     geofence_data: GeofenceAreaCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create a new geofence area."""
@@ -172,7 +172,7 @@ async def create_geofence_area(
 
 @router.get("/geofences", response_model=List[GeofenceAreaResponse])
 async def get_geofence_areas(
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get all geofence areas for current user."""
@@ -184,7 +184,7 @@ async def get_geofence_areas(
 async def update_geofence_area(
     geofence_id: int,
     geofence_data: GeofenceAreaUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update a geofence area."""
@@ -203,7 +203,7 @@ async def update_geofence_area(
 @router.delete("/geofences/{geofence_id}")
 async def delete_geofence_area(
     geofence_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Delete a geofence area."""
@@ -223,7 +223,7 @@ async def get_geofence_events(
     start_time: Optional[datetime] = Query(None, description="Start time for events"),
     end_time: Optional[datetime] = Query(None, description="End time for events"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of events"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get geofence events for current user."""
@@ -236,7 +236,7 @@ async def get_geofence_events(
 @router.get("/stats", response_model=LocationStatsResponse)
 async def get_location_stats(
     days: int = Query(30, ge=1, le=365, description="Number of days for statistics"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get location statistics for current user."""
@@ -248,7 +248,7 @@ async def get_location_stats(
 @router.post("/admin/cleanup")
 async def cleanup_old_location_data(
     days: int = Query(90, ge=30, le=365, description="Days to keep"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserResponse = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Clean up old location data (admin only)."""

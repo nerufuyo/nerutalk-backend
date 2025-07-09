@@ -41,7 +41,7 @@ class Message(Base):
         file_name: Original file name
         file_size: File size in bytes
         thumbnail_url: URL to thumbnail (for images/videos)
-        metadata: Additional message metadata (JSON)
+        message_metadata: Additional message metadata (JSON)
         reply_to_id: ID of message being replied to
         is_edited: Whether the message has been edited
         is_deleted: Whether the message is deleted
@@ -67,7 +67,7 @@ class Message(Base):
     thumbnail_url = Column(Text, nullable=True)
     
     # Message metadata (JSON field for additional data like location coordinates, sticker info, etc.)
-    metadata = Column(Text, nullable=True)  # Store as JSON string
+    message_metadata = Column(Text, nullable=True)  # Store as JSON string
     
     # Reply functionality
     reply_to_id = Column(UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
